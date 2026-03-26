@@ -39,6 +39,13 @@ RUN apk add --no-cache tzdata wget
 RUN mkdir -p /app
 COPY --from=builder /app/cliproxyapi /app/cliproxyapi
 
+# config.example.yaml is required by CLIProxyAPI to bootstrap configuration when
+# using object store (R2) or postgres store mode. The binary looks for this file
+# in its working directory on startup.
+COPY config.example.yaml /app/config.example.yaml
+
+WORKDIR /app
+
 # Declare the port CLIProxyAPI listens on so Cloudflare can route traffic
 EXPOSE 8317
 
