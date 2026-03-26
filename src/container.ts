@@ -39,4 +39,25 @@ const CONTAINER_PORT = 8317;
 export class CLIProxyContainer extends Container {
   /** Forward all requests to the CLIProxyAPI HTTP server inside the container */
   override defaultPort = CONTAINER_PORT;
+
+  /**
+   * Override fetch to explicitly start the container and wait for the
+   * configured port to be ready before forwarding each request.
+   *
+   * The base class Container.fetch() calls containerFetch() which checks
+   * `container.running` to decide whether to call startAndWaitForPorts().
+   * When the container is asleep or has just stopped, `container.running`
+   * can transiently report `true` (stale state), causing the startup check
+   * to be skipped. The subsequent TCP port probe then throws:
+   *   "The container is not running, consider calling start()"
+   *
+   * By calling startAndWaitForPorts() here first we guarantee the container
+   * is fully started and the port is accepting connections before any
+   * proxying takes place. If the container is already healthy this call
+   * returns immediately and has no performance impact.
+   */
+  override async fetch(request: Request): Promise<Response> {
+    await this.startAndWaitForPorts(CONTAINER_PORT);
+    return super.fetch(request);
+  }
 }
