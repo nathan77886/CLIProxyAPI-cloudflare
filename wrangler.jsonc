@@ -33,7 +33,10 @@
       "max_instances": 2
     }
   ],
-
+  "vars": {
+    "PGSTORE_DSN": "",
+    "MANAGEMENT_PASSWORD": ""
+  },
   // --------------------------------------------------------------------------
   // Durable Object binding for the container class
   // The class_name must match the export in src/index.ts and the containers
