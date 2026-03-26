@@ -42,8 +42,8 @@ export class CLIProxyContainer extends Container {
   // 关键：把 Worker vars / secrets 传给容器
   override envVars = {
     PORT: String(CONTAINER_PORT),
-    PGSTORE_DSN: env.PGSTORE_DSN,
-    MANAGEMENT_PASSWORD: env.MANAGEMENT_PASSWORD,
+    PGSTORE_DSN: (env as Record<string, string>).PGSTORE_DSN,
+    MANAGEMENT_PASSWORD: (env as Record<string, string>).MANAGEMENT_PASSWORD,
 
     // 你后面如果还要传 R2/S3 兼容配置，也放这里
     // OBJECTSTORE_ENDPOINT: env.OBJECTSTORE_ENDPOINT,
