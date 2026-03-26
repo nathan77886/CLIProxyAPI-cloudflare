@@ -2,7 +2,8 @@
 # ---------------------------------------------------------------------------
 # Dockerfile — CLIProxyAPI container for Cloudflare Containers
 #
-# Base image: official CLIProxyAPI image from Docker Hub
+# Builds CLIProxyAPI from source (github.com/router-for-me/CLIProxyAPI)
+# using a multi-stage build, so no pre-built Docker Hub image is required.
 # Port: 8317 (CLIProxyAPI default)
 #
 # Environment variables injected by Cloudflare at runtime (set via secrets):
@@ -15,7 +16,28 @@
 #   - MANAGEMENT_PASSWORD   : CLIProxyAPI management password
 # ---------------------------------------------------------------------------
 
-FROM soulteary/cliproxyapi:latest
+# Stage 1 — clone and compile CLIProxyAPI from source
+FROM golang:1.24-alpine AS builder
+
+RUN apk add --no-cache git
+
+WORKDIR /src
+
+RUN git clone --depth 1 https://github.com/router-for-me/CLIProxyAPI.git .
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-s -w" \
+    -o /app/cliproxyapi \
+    ./cmd/server/
+
+# Stage 2 — minimal runtime image
+FROM alpine:3.22
+
+RUN apk add --no-cache tzdata wget
+
+# Binary lives at /app/cliproxyapi — matches the exec path in scripts/start.sh
+RUN mkdir -p /app
+COPY --from=builder /app/cliproxyapi /app/cliproxyapi
 
 # Declare the port CLIProxyAPI listens on so Cloudflare can route traffic
 EXPOSE 8317
