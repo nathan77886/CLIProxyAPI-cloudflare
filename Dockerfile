@@ -43,6 +43,7 @@ COPY --from=builder /app/cliproxyapi /app/cliproxyapi
 # using object store (R2) or postgres store mode. The binary looks for this file
 # in its working directory on startup.
 COPY config.example.yaml /app/config.yaml
+COPY config.example.yaml /app/config.example.yaml
 
 WORKDIR /app
 
