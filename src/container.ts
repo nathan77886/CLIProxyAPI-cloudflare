@@ -20,7 +20,7 @@
  */
 
 import { Container } from "@cloudflare/containers";
-
+import { env } from "cloudflare:workers";
 /** The port CLIProxyAPI listens on inside the container */
 const CONTAINER_PORT = 8317;
 
