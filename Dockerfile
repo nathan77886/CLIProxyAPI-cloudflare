@@ -42,7 +42,7 @@ COPY --from=builder /app/cliproxyapi /app/cliproxyapi
 # config.example.yaml is required by CLIProxyAPI to bootstrap configuration when
 # using object store (R2) or postgres store mode. The binary looks for this file
 # in its working directory on startup.
-COPY config.example.yaml /app/config.example.yaml
+COPY config.example.yaml /app/config.yaml
 
 WORKDIR /app
 
