@@ -107,6 +107,23 @@ npm run type-check
 
 ## Deployment
 
+> **Important:** This Worker uses Durable Object migrations, which are **incompatible with Cloudflare's gradual-deployment system** (`wrangler versions upload`). Always deploy using `wrangler deploy` — either via the GitHub Actions workflow below or manually. Do **not** enable Cloudflare's built-in Workers CI for this repository, as it uses `wrangler versions upload` by default and will fail with Cloudflare error 10211: "migrations must be fully applied by running wrangler deploy".
+
+### CI/CD via GitHub Actions (recommended)
+
+Deployment runs automatically on every push to `main` via `.github/workflows/deploy.yml`.
+
+Add the following secrets to your GitHub repository (**Settings → Secrets and variables → Actions**):
+
+| Secret | Description |
+|--------|-------------|
+| `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers edit permission |
+| `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
+
+Push to `main` — the workflow runs `wrangler deploy` automatically.
+
+### Manual deployment
+
 ### 1. Install Wrangler and log in
 
 ```bash
@@ -125,28 +142,20 @@ wrangler secret put OBJECTSTORE_SECRET_KEY
 wrangler secret put MANAGEMENT_PASSWORD
 ```
 
-### 3. Build the container image
-
-Cloudflare builds the container image from the Dockerfile automatically when you run `wrangler deploy`. Alternatively, build and push manually:
-
-```bash
-# Wrangler handles this automatically:
-wrangler deploy
-```
-
-### 4. Update wrangler.jsonc
+### 3. Update wrangler.jsonc
 
 - Replace `api.example.com` with your actual domain.
 - Set `zone_name` to your Cloudflare zone.
-- Replace `REPLACE_WITH_R2_ENDPOINT` and `REPLACE_WITH_BUCKET_NAME` with real values.
 
-### 5. Deploy
+### 4. Deploy
 
 ```bash
+# Must use wrangler deploy (not wrangler versions upload) — required for
+# Workers that include Durable Object migrations.
 wrangler deploy
 ```
 
-### 6. Verify
+### 5. Verify
 
 ```bash
 curl https://api.example.com/health
