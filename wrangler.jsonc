@@ -2,7 +2,7 @@
  * wrangler.jsonc - Cloudflare Workers + Containers configuration
  *
  * Environment variable usage:
- *   Container-level (injected via container_env / secrets):
+ *   Container-level (injected via wrangler secrets):
  *     - PGSTORE_DSN           : PostgreSQL DSN for direct DB connection from Container
  *     - OBJECTSTORE_ENDPOINT  : R2-compatible S3 endpoint URL
  *     - OBJECTSTORE_ACCESS_KEY: R2 access key ID
@@ -29,17 +29,34 @@
     {
       "class_name": "CLIProxyContainer",
       "image": "./Dockerfile",
-      "max_instances": 2,
-      // Port CLIProxyAPI listens on inside the container
-      "port": 8317,
-      // Container-level environment variables
-      // Plaintext values can go here; secrets MUST be set via `wrangler secret`
-      "container_env": {
-        // TODO: replace placeholder values with real ones or use secrets
-        "PORT": "8317",
-        "OBJECTSTORE_ENDPOINT": "REPLACE_WITH_R2_ENDPOINT",
-        "OBJECTSTORE_BUCKET": "REPLACE_WITH_BUCKET_NAME"
+      "max_instances": 2
+    }
+  ],
+
+  // --------------------------------------------------------------------------
+  // Durable Object binding for the container class
+  // The class_name must match the export in src/index.ts and the containers
+  // array above. The binding name must match Env.CONTAINER in src/types.ts.
+  // --------------------------------------------------------------------------
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CONTAINER",
+        "class_name": "CLIProxyContainer"
       }
+    ]
+  },
+
+  // --------------------------------------------------------------------------
+  // Durable Object migrations
+  // Required the first time a DO class is introduced. Using new_sqlite_classes
+  // (SQLite-backed storage) which is the current default for new DO classes.
+  // See: https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/
+  // --------------------------------------------------------------------------
+  "migrations": [
+    {
+      "tag": "v1-add-cliproxycontainer",
+      "new_sqlite_classes": ["CLIProxyContainer"]
     }
   ],
 
