@@ -11,7 +11,8 @@
  *   1. Worker receives a request.
  *   2. Worker calls `env.CONTAINER.get(id)` to obtain a Durable Object stub.
  *   3. Worker calls `stub.fetch(request)` which is routed here.
- *   4. This class forwards the request to the actual CLIProxyAPI process
+ *   4. This class uses `ctx.container.getTcpPort()` — the official Cloudflare
+ *      Workers Containers API — to forward requests to the CLIProxyAPI process
  *      running inside the container on port 8317.
  *
  * Container environment variables (injected by Cloudflare, NOT visible to
@@ -25,25 +26,7 @@
  *   - MANAGEMENT_PASSWORD   : CLIProxyAPI management password
  */
 
-// Cloudflare's Container base class is provided by the Workers runtime.
-// The import path uses the cloudflare:workers module which is available
-// in the Workers environment at runtime (not at compile time via npm).
-// We declare a minimal interface here to satisfy the TypeScript compiler.
-
-/** Minimal interface matching the Cloudflare Container Durable Object base */
-interface CloudflareContainer {
-  fetch(request: Request): Promise<Response>;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const Container: new (ctx: DurableObjectState, env: unknown) => CloudflareContainer =
-  // At runtime Cloudflare provides this via `cloudflare:workers`; at compile
-  // time we fall back to a no-op base so TypeScript is satisfied.
-  (class {
-    fetch(_request: Request): Promise<Response> {
-      return Promise.resolve(new Response("Container base not available", { status: 500 }));
-    }
-  }) as unknown as new (ctx: DurableObjectState, env: unknown) => CloudflareContainer;
+import type { Env } from "./types.js";
 
 /** The port CLIProxyAPI listens on inside the container */
 const CONTAINER_PORT = 8317;
@@ -54,32 +37,54 @@ const CONTAINER_PORT = 8317;
  * Durable Object / Container class that wraps the CLIProxyAPI process.
  * The Workers runtime starts one container instance per Durable Object ID.
  *
- * All requests arrive via `fetch()` which is called by the Worker's proxy
- * layer. The method simply rewrites the URL to target localhost inside the
- * container and delegates to the base class's built-in HTTP forwarding.
+ * Requests arrive via `fetch()` from the Worker's proxy layer. The method
+ * uses `ctx.container.getTcpPort()` to obtain a Fetcher that routes
+ * requests directly to the CLIProxyAPI HTTP server inside the container.
+ *
+ * See: https://developers.cloudflare.com/workers/configuration/containers/
  */
-export class CLIProxyContainer implements CloudflareContainer {
-  // Delegate fetch to the Cloudflare Container base class.
-  // The base class routes the request to the container's internal HTTP server.
-  private readonly base: CloudflareContainer;
+export class CLIProxyContainer {
+  private readonly ctx: DurableObjectState;
 
-  constructor(ctx: DurableObjectState, env: unknown) {
-    this.base = new Container(ctx, env);
+  constructor(ctx: DurableObjectState, _env: Env) {
+    this.ctx = ctx;
   }
 
   /**
    * Handle a proxied request from the Worker.
    *
-   * The incoming URL has already been rewritten by the Worker to use the
-   * container's Durable Object fetch path. We forward it to the CLIProxyAPI
-   * process running on CONTAINER_PORT.
+   * Uses `ctx.container.getTcpPort(CONTAINER_PORT)` to get a Fetcher bound
+   * to the container's internal HTTP server, then forwards the request with
+   * the URL rewritten to localhost so the CLIProxyAPI process receives the
+   * correct path and query string.
    */
   async fetch(request: Request): Promise<Response> {
-    // Rewrite URL to target the container-internal HTTP server
-    const url = new URL(request.url);
-    const targetUrl = `http://localhost:${CONTAINER_PORT}${url.pathname}${url.search}`;
+    const container = this.ctx.container;
+
+    if (!container) {
+      console.error("[container] ctx.container is not available -- is this DO bound to a container in wrangler.jsonc?");
+      return new Response(
+        JSON.stringify({
+          error: "Container Error",
+          message: "Container binding unavailable",
+        }),
+        {
+          status: 503,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
 
     try {
+      // Get a Fetcher for the container's TCP port.
+      // getTcpPort() routes HTTP requests to the container process on that port.
+      const fetcher = container.getTcpPort(CONTAINER_PORT);
+
+      // Rewrite URL to target the container-internal HTTP server so the
+      // CLIProxyAPI process receives the correct Host and path.
+      const url = new URL(request.url);
+      const targetUrl = `http://localhost:${CONTAINER_PORT}${url.pathname}${url.search}`;
+
       const proxiedRequest = new Request(targetUrl, {
         method: request.method,
         headers: request.headers,
@@ -91,7 +96,7 @@ export class CLIProxyContainer implements CloudflareContainer {
         duplex: "half",
       });
 
-      return await this.base.fetch(proxiedRequest);
+      return await fetcher.fetch(proxiedRequest);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[container] Error forwarding to CLIProxyAPI:", message);
