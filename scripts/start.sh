@@ -17,21 +17,21 @@ set -eu
 # Required environment variables
 # ---------------------------------------------------------------------------
 # DB connection is direct from container — no Hyperdrive
-REQUIRED_VARS="PGSTORE_DSN OBJECTSTORE_ENDPOINT OBJECTSTORE_ACCESS_KEY OBJECTSTORE_SECRET_KEY OBJECTSTORE_BUCKET"
+# REQUIRED_VARS="PGSTORE_DSN OBJECTSTORE_ENDPOINT OBJECTSTORE_ACCESS_KEY OBJECTSTORE_SECRET_KEY OBJECTSTORE_BUCKET"
 echo $PGSTORE_DSN
-MISSING=""
-for VAR in $REQUIRED_VARS; do
-  # Use indirect variable expansion (POSIX sh safe)
-  eval "VALUE=\${${VAR}:-}"
-  if [ -z "$VALUE" ]; then
-    MISSING="$MISSING $VAR"
-  fi
-done
+# MISSING=""
+# for VAR in $REQUIRED_VARS; do
+#   # Use indirect variable expansion (POSIX sh safe)
+#   eval "VALUE=\${${VAR}:-}"
+#   if [ -z "$VALUE" ]; then
+#     MISSING="$MISSING $VAR"
+#   fi
+# done
 
-if [ -n "$MISSING" ]; then
-  echo "{\"level\":\"ERROR\",\"msg\":\"Missing required environment variables\",\"vars\":\"$MISSING\"}" >&2
-  exit 1
-fi
+# if [ -n "$MISSING" ]; then
+#   echo "{\"level\":\"ERROR\",\"msg\":\"Missing required environment variables\",\"vars\":\"$MISSING\"}" >&2
+#   exit 1
+# fi
 
 # ---------------------------------------------------------------------------
 # Startup log (no secret values logged)
