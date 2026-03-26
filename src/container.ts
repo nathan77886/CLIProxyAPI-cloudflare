@@ -39,7 +39,18 @@ const CONTAINER_PORT = 8317;
 export class CLIProxyContainer extends Container {
   /** Forward all requests to the CLIProxyAPI HTTP server inside the container */
   override defaultPort = CONTAINER_PORT;
+  // 关键：把 Worker vars / secrets 传给容器
+  override envVars = {
+    PORT: String(CONTAINER_PORT),
+    PGSTORE_DSN: env.PGSTORE_DSN,
+    MANAGEMENT_PASSWORD: env.MANAGEMENT_PASSWORD,
 
+    // 你后面如果还要传 R2/S3 兼容配置，也放这里
+    // OBJECTSTORE_ENDPOINT: env.OBJECTSTORE_ENDPOINT,
+    // OBJECTSTORE_ACCESS_KEY: env.OBJECTSTORE_ACCESS_KEY,
+    // OBJECTSTORE_SECRET_KEY: env.OBJECTSTORE_SECRET_KEY,
+    // OBJECTSTORE_BUCKET: env.OBJECTSTORE_BUCKET,
+  };
   /**
    * Override fetch to explicitly start the container and wait for the
    * configured port to be ready before forwarding each request.
