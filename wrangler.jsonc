@@ -29,7 +29,11 @@
     {
       "class_name": "CLIProxyContainer",
       "image": "./Dockerfile",
-      "max_instances": 2
+      "max_instances": 2,
+      "env": {
+        "PGSTORE_DSN": "${PGSTORE_DSN}",
+        "MANAGEMENT_PASSWORD":"${MANAGEMENT_PASSWORD}"
+      }
     }
   ],
 
