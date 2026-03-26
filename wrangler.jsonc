@@ -58,15 +58,5 @@
       "tag": "v1-add-cliproxycontainer",
       "new_sqlite_classes": ["CLIProxyContainer"]
     }
-  ],
-
-  // --------------------------------------------------------------------------
-  // Routes / custom domains (update to match your actual domain)
-  // --------------------------------------------------------------------------
-  "routes": [
-    {
-      "pattern": "api.example.com/*",
-      "zone_name": "example.com"
-    }
   ]
 }
