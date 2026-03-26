@@ -1,16 +1,16 @@
 /**
  * src/auth.ts
  *
- * Bearer-token authentication middleware for the Cloudflare Worker.
- *
- * Security model:
- *   - Every request (except public routes like /health) MUST carry
- *     a valid "Authorization: Bearer <API_TOKEN>" header.
- *   - The token is compared in constant time to prevent timing attacks.
- *   - API_TOKEN is injected as a Worker secret via `wrangler secret put`.
+ * Bearer-token authentication middleware (unused — CLIProxyAPI handles auth
+ * internally inside the container). Kept for reference only.
  */
 
-import type { AuthResult } from "./types.js";
+/** Result of an authentication check */
+interface AuthResult {
+  readonly ok: boolean;
+  /** Human-readable reason when ok === false */
+  readonly reason?: string;
+}
 
 /**
  * Performs a timing-safe comparison of two strings.

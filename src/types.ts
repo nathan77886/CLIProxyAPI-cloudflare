@@ -12,13 +12,6 @@
 // ---------------------------------------------------------------------------
 export interface Env {
   /**
-   * Bearer token used to authenticate all inbound requests to the Worker.
-   * Set via: wrangler secret put API_TOKEN
-   * Used in: Worker only (auth.ts)
-   */
-  readonly API_TOKEN: string;
-
-  /**
    * Durable Object namespace binding for the container class.
    * Cloudflare injects this automatically based on `containers[].class_name`
    * in wrangler.jsonc.
@@ -79,18 +72,3 @@ export type HttpMethod =
   | "DELETE"
   | "HEAD"
   | "OPTIONS";
-
-/** Result of an authentication check */
-export interface AuthResult {
-  readonly ok: boolean;
-  /** Human-readable reason when ok === false */
-  readonly reason?: string;
-}
-
-/** Routing decision returned by the router */
-export interface RouteMatch {
-  /** Whether the route matched a known handler */
-  readonly matched: boolean;
-  /** Whether this route bypasses auth (e.g. /health) */
-  readonly publicRoute: boolean;
-}
