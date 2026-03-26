@@ -46,17 +46,7 @@
       }
     ]
   },
-
-  // --------------------------------------------------------------------------
-  // Durable Object migrations
-  // Required the first time a DO class is introduced. Using new_sqlite_classes
-  // (SQLite-backed storage) which is the current default for new DO classes.
-  // See: https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/
-  // --------------------------------------------------------------------------
-  "migrations": [
-    {
-      "tag": "v1-add-cliproxycontainer",
-      "new_sqlite_classes": ["CLIProxyContainer"]
-    }
-  ]
+"observability": {
+  "enabled": true,
+}
 }
