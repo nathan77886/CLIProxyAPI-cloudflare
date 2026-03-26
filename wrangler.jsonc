@@ -18,6 +18,7 @@
   "name": "cliproxy-api",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-01",
+  "keep_vars": true,
   "compatibility_flags": ["nodejs_compat"],
 
   // --------------------------------------------------------------------------
