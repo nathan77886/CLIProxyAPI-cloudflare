@@ -44,12 +44,10 @@ export class CLIProxyContainer extends Container {
     PORT: String(CONTAINER_PORT),
     PGSTORE_DSN: (env as Record<string, string>).PGSTORE_DSN ?? "",
     MANAGEMENT_PASSWORD: (env as Record<string, string>).MANAGEMENT_PASSWORD ?? "",
-
-    // 你后面如果还要传 R2/S3 兼容配置，也放这里
-    // OBJECTSTORE_ENDPOINT: env.OBJECTSTORE_ENDPOINT,
-    // OBJECTSTORE_ACCESS_KEY: env.OBJECTSTORE_ACCESS_KEY,
-    // OBJECTSTORE_SECRET_KEY: env.OBJECTSTORE_SECRET_KEY,
-    // OBJECTSTORE_BUCKET: env.OBJECTSTORE_BUCKET,
+    OBJECTSTORE_ENDPOINT: (env as Record<string, string>).OBJECTSTORE_ENDPOINT ?? "",
+    OBJECTSTORE_ACCESS_KEY: (env as Record<string, string>).OBJECTSTORE_ACCESS_KEY ?? "",
+    OBJECTSTORE_SECRET_KEY: (env as Record<string, string>).OBJECTSTORE_SECRET_KEY ?? "",
+    OBJECTSTORE_BUCKET: (env as Record<string, string>).OBJECTSTORE_BUCKET ?? "",
   };
   /**
    * Override fetch to explicitly start the container and wait for the
