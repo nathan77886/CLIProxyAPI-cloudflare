@@ -2,9 +2,6 @@
  * wrangler.jsonc - Cloudflare Workers + Containers configuration
  *
  * Environment variable usage:
- *   Worker-level (set here or via `wrangler secret put`):
- *     - API_TOKEN             : Bearer token required on every request (Worker validates)
- *
  *   Container-level (injected via container_env / secrets):
  *     - PGSTORE_DSN           : PostgreSQL DSN for direct DB connection from Container
  *     - OBJECTSTORE_ENDPOINT  : R2-compatible S3 endpoint URL
@@ -12,6 +9,9 @@
  *     - OBJECTSTORE_SECRET_KEY: R2 secret access key
  *     - OBJECTSTORE_BUCKET    : R2 bucket name
  *     - MANAGEMENT_PASSWORD   : CLIProxyAPI management console password
+ *
+ * Note: No API_TOKEN is required. Authentication is handled entirely by
+ *       CLIProxyAPI inside the container. The Worker is a pure pass-through.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -44,14 +44,6 @@
   ],
 
   // --------------------------------------------------------------------------
-  // Worker environment variables (non-secret, overridable per environment)
-  // --------------------------------------------------------------------------
-  "vars": {
-    // Placeholder — set the real value with: wrangler secret put API_TOKEN
-    "API_TOKEN": "REPLACE_WITH_SECURE_TOKEN"
-  },
-
-  // --------------------------------------------------------------------------
   // Routes / custom domains (update to match your actual domain)
   // --------------------------------------------------------------------------
   "routes": [
@@ -59,21 +51,5 @@
       "pattern": "api.example.com/*",
       "zone_name": "example.com"
     }
-  ],
-
-  // --------------------------------------------------------------------------
-  // Per-environment overrides
-  // --------------------------------------------------------------------------
-  "env": {
-    "production": {
-      "vars": {
-        "API_TOKEN": "REPLACE_WITH_PRODUCTION_TOKEN"
-      }
-    },
-    "staging": {
-      "vars": {
-        "API_TOKEN": "REPLACE_WITH_STAGING_TOKEN"
-      }
-    }
-  }
+  ]
 }

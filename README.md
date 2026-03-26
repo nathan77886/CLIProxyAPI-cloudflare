@@ -6,17 +6,17 @@ Cloudflare-native deployment of [CLIProxyAPI](https://github.com/soulteary/CLIPr
 Internet
    │
    ▼
-Cloudflare Worker  (auth + routing + proxy)
+Cloudflare Worker  (transparent proxy — no auth, no routing)
    │
    ▼
-Cloudflare Container  (CLIProxyAPI process)
+Cloudflare Container  (CLIProxyAPI process — handles auth internally)
    │              │
    ▼              ▼
 PostgreSQL       Cloudflare R2
 (Aliyun SG)     (object storage)
 ```
 
-The **Worker** is the only public entry point. The Container is never directly reachable.
+The **Worker** is the only public entry point and acts as a pure pass-through proxy. The Container is never directly reachable. Authentication is handled entirely by CLIProxyAPI inside the container.
 
 ---
 
@@ -25,12 +25,12 @@ The **Worker** is the only public entry point. The Container is never directly r
 ```
 .
 ├── src/
-│   ├── index.ts        # Worker entry point (routing, auth, proxy orchestration)
-│   ├── auth.ts         # Bearer-token authentication middleware
-│   ├── proxy.ts        # HTTP reverse-proxy logic (streaming support)
-│   ├── websocket.ts    # WebSocket proxy logic
+│   ├── index.ts        # Worker entry point (transparent proxy)
 │   ├── container.ts    # Cloudflare Container Durable Object class
-│   └── types.ts        # Shared TypeScript types
+│   ├── types.ts        # Shared TypeScript types
+│   ├── auth.ts         # (reference only) Bearer-token auth — not used by Worker
+│   ├── proxy.ts        # (reference only) HTTP reverse-proxy helpers
+│   └── websocket.ts    # (reference only) WebSocket proxy helpers
 ├── scripts/
 │   └── start.sh        # Container startup script (env validation + exec)
 ├── Dockerfile          # Container image definition
@@ -43,23 +43,19 @@ The **Worker** is the only public entry point. The Container is never directly r
 
 ## Environment Variables
 
-### Worker-level (validated by the Worker)
-
-| Variable | Where Set | Description |
-|----------|-----------|-------------|
-| `API_TOKEN` | `wrangler secret put API_TOKEN` | Bearer token required on every request |
-
 ### Container-level (injected into the container process)
 
 | Variable | Where Set | Description |
 |----------|-----------|-------------|
-| `PORT` | `wrangler.jsonc` `container_env` | Port CLIProxyAPI listens on (default: 8317) |
+| `PORT` | `wrangler.jsonc` `container_env` | Port CLIProxyAPI listens on (hardcoded: 8317) |
 | `PGSTORE_DSN` | `wrangler secret put PGSTORE_DSN` | PostgreSQL DSN — **direct connection**, no Hyperdrive |
 | `OBJECTSTORE_ENDPOINT` | `wrangler secret put OBJECTSTORE_ENDPOINT` | R2-compatible S3 endpoint URL |
 | `OBJECTSTORE_ACCESS_KEY` | `wrangler secret put OBJECTSTORE_ACCESS_KEY` | R2 access key ID |
 | `OBJECTSTORE_SECRET_KEY` | `wrangler secret put OBJECTSTORE_SECRET_KEY` | R2 secret access key |
 | `OBJECTSTORE_BUCKET` | `wrangler.jsonc` `container_env` | R2 bucket name |
 | `MANAGEMENT_PASSWORD` | `wrangler secret put MANAGEMENT_PASSWORD` | CLIProxyAPI management password |
+
+> **Note:** No `API_TOKEN` is needed at the Worker level. CLIProxyAPI provides its own authentication inside the container on port 8317.
 
 > **Security note:** Never commit real secret values. Always use `wrangler secret put` for sensitive values.
 
@@ -83,7 +79,6 @@ npm install
 
 ```bash
 cat > .dev.vars <<EOF
-API_TOKEN=dev-token-change-me
 PGSTORE_DSN=postgres://user:pass@localhost:5432/cliproxyapi?sslmode=disable
 OBJECTSTORE_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com
 OBJECTSTORE_ACCESS_KEY=your-r2-access-key
@@ -122,9 +117,6 @@ wrangler login
 ### 2. Set secrets
 
 ```bash
-# Worker secret
-wrangler secret put API_TOKEN
-
 # Container secrets (injected into the container process at runtime)
 wrangler secret put PGSTORE_DSN
 wrangler secret put OBJECTSTORE_ENDPOINT
@@ -152,33 +144,31 @@ wrangler deploy
 
 ```bash
 wrangler deploy
-# or for a specific environment:
-wrangler deploy --env production
 ```
 
 ### 6. Verify
 
 ```bash
 curl https://api.example.com/health
-# {"status":"ok","service":"cliproxyapi-worker"}
+# Response is forwarded directly from CLIProxyAPI
 ```
 
 ---
 
 ## Example Requests
 
-### Health check (public, no auth)
+All requests are forwarded transparently to CLIProxyAPI. Authentication headers are passed through as-is and validated by CLIProxyAPI inside the container.
+
+### Health check
 
 ```bash
 curl https://api.example.com/health
 ```
 
-### Authenticated API request
+### API request
 
 ```bash
-export API_TOKEN="your-bearer-token"
-
-curl -H "Authorization: Bearer $API_TOKEN" \
+curl -H "Authorization: Bearer $YOUR_CLIPROXY_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}]}' \
      https://api.example.com/v1/chat/completions
@@ -187,7 +177,7 @@ curl -H "Authorization: Bearer $API_TOKEN" \
 ### Streaming request (OpenAI-style SSE)
 
 ```bash
-curl -H "Authorization: Bearer $API_TOKEN" \
+curl -H "Authorization: Bearer $YOUR_CLIPROXY_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{"model":"gpt-4","messages":[{"role":"user","content":"Hello"}],"stream":true}' \
      --no-buffer \
@@ -198,19 +188,18 @@ curl -H "Authorization: Bearer $API_TOKEN" \
 
 ```bash
 # Using wscat (npm install -g wscat)
-wscat -c "wss://api.example.com/ws" \
-      -H "Authorization: Bearer $API_TOKEN"
+wscat -c "wss://api.example.com/ws"
 ```
 
 ---
 
-## Security Architecture
+## Architecture
 
-1. **Worker validates Bearer token** on every request before touching the container.
-2. **Container is not publicly exposed** — only reachable via Worker Durable Object binding.
-3. **DB credentials** (`PGSTORE_DSN`) are injected only into the container process, never into the Worker.
-4. **Authorization header** is stripped before forwarding to the container.
-5. **Timing-safe comparison** prevents token enumeration attacks.
+1. **Worker is a pure pass-through** — all requests (HTTP and WebSocket) are forwarded to the container without any modification or auth check.
+2. **Authentication is handled by CLIProxyAPI** inside the container on port **8317**.
+3. **Container is not publicly exposed** — only reachable via Worker Durable Object binding.
+4. **DB credentials** (`PGSTORE_DSN`) are injected only into the container process, never into the Worker.
+5. **Port 8317 is hardcoded** — CLIProxyAPI always listens on this port inside the container.
 
 ---
 
@@ -225,11 +214,4 @@ wscat -c "wss://api.example.com/ws" \
 // TODO: Metrics
 // Add Workers Analytics Engine bindings for per-request metrics.
 // See: https://developers.cloudflare.com/analytics/analytics-engine/
-
-// TODO: Audit logs
-// Log auth events (success/failure) to an audit trail (KV or external sink).
-
-// TODO: Rate limiting
-// Add Cloudflare Rate Limiting rules or Workers Rate Limiting API.
-// See: https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/
 ```
