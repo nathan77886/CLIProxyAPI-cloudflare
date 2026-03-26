@@ -17,7 +17,7 @@
 # ---------------------------------------------------------------------------
 
 # Stage 1 — clone and compile CLIProxyAPI from source
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 RUN apk add --no-cache git
 
