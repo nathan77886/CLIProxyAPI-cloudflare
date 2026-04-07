@@ -34,6 +34,13 @@ function getContainerStub(env: Env): DurableObjectStub {
   return env.CONTAINER.get(id);
 }
 
+/** Convert a Headers object into a plain key→value record for JSON logging. */
+function headersToRecord(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, key) => { result[key] = value; });
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Main fetch handler — transparent proxy, no auth, no routing
 // ---------------------------------------------------------------------------
@@ -61,8 +68,7 @@ const worker = {
       try {
         const response = await stub.fetch(request);
         if (response.status === 403) {
-          const reqHeaders: Record<string, string> = {};
-          request.headers.forEach((value, key) => { reqHeaders[key] = value; });
+          const reqHeaders = headersToRecord(request.headers);
           console.error(
             `[worker] WS 403 ${method} ${url}`,
             JSON.stringify({ requestHeaders: reqHeaders })
@@ -95,10 +101,8 @@ const worker = {
         } catch {
           // ignore body-read failures
         }
-        const reqHeaders: Record<string, string> = {};
-        request.headers.forEach((value, key) => { reqHeaders[key] = value; });
-        const resHeaders: Record<string, string> = {};
-        response.headers.forEach((value, key) => { resHeaders[key] = value; });
+        const reqHeaders = headersToRecord(request.headers);
+        const resHeaders = headersToRecord(response.headers);
         console.error(
           `[worker] 403 detail ${method} ${url}`,
           JSON.stringify({ requestHeaders: reqHeaders, responseHeaders: resHeaders, responseBody })
