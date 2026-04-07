@@ -64,7 +64,6 @@ const worker = {
     // WebSocket upgrade
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader?.toLowerCase() === "websocket") {
-      console.log(`[worker] WS  ${method} ${url}`);
       try {
         const response = await stub.fetch(request);
         if (response.status === 403) {
@@ -86,10 +85,8 @@ const worker = {
     }
 
     // Standard HTTP — forward everything to the container
-    console.log(`[worker] --> ${method} ${url}`);
     try {
       const response = await stub.fetch(request);
-      console.log(`[worker] <-- ${method} ${url} ${response.status}`);
 
       if (response.status === 403) {
         // Clone the response so we can read the body for logging while still
