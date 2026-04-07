@@ -34,6 +34,13 @@ function getContainerStub(env: Env): DurableObjectStub {
   return env.CONTAINER.get(id);
 }
 
+/** Convert a Headers object into a plain key→value record for JSON logging. */
+function headersToRecord(headers: Headers): Record<string, string> {
+  const result: Record<string, string> = {};
+  headers.forEach((value, key) => { result[key] = value; });
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Main fetch handler — transparent proxy, no auth, no routing
 // ---------------------------------------------------------------------------
@@ -52,11 +59,22 @@ const worker = {
       );
     }
 
+    const { method, url } = request;
+
     // WebSocket upgrade
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader?.toLowerCase() === "websocket") {
+      console.log(`[worker] WS  ${method} ${url}`);
       try {
-        return await stub.fetch(request);
+        const response = await stub.fetch(request);
+        if (response.status === 403) {
+          const reqHeaders = headersToRecord(request.headers);
+          console.error(
+            `[worker] WS 403 ${method} ${url}`,
+            JSON.stringify({ requestHeaders: reqHeaders })
+          );
+        }
+        return response;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[worker] WebSocket proxy error:", message);
@@ -68,8 +86,30 @@ const worker = {
     }
 
     // Standard HTTP — forward everything to the container
+    console.log(`[worker] --> ${method} ${url}`);
     try {
-      return await stub.fetch(request);
+      const response = await stub.fetch(request);
+      console.log(`[worker] <-- ${method} ${url} ${response.status}`);
+
+      if (response.status === 403) {
+        // Clone the response so we can read the body for logging while still
+        // returning the original (unread) stream to the caller.
+        const cloned = response.clone();
+        let responseBody = "(unreadable)";
+        try {
+          responseBody = await cloned.text();
+        } catch {
+          // ignore body-read failures
+        }
+        const reqHeaders = headersToRecord(request.headers);
+        const resHeaders = headersToRecord(response.headers);
+        console.error(
+          `[worker] 403 detail ${method} ${url}`,
+          JSON.stringify({ requestHeaders: reqHeaders, responseHeaders: resHeaders, responseBody })
+        );
+      }
+
+      return response;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[worker] HTTP proxy error:", message);
