@@ -52,11 +52,23 @@ const worker = {
       );
     }
 
+    const { method, url } = request;
+
     // WebSocket upgrade
     const upgradeHeader = request.headers.get("Upgrade");
     if (upgradeHeader?.toLowerCase() === "websocket") {
+      console.log(`[worker] WS  ${method} ${url}`);
       try {
-        return await stub.fetch(request);
+        const response = await stub.fetch(request);
+        if (response.status === 403) {
+          const reqHeaders: Record<string, string> = {};
+          request.headers.forEach((value, key) => { reqHeaders[key] = value; });
+          console.error(
+            `[worker] WS 403 ${method} ${url}`,
+            JSON.stringify({ requestHeaders: reqHeaders })
+          );
+        }
+        return response;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         console.error("[worker] WebSocket proxy error:", message);
@@ -68,8 +80,32 @@ const worker = {
     }
 
     // Standard HTTP — forward everything to the container
+    console.log(`[worker] --> ${method} ${url}`);
     try {
-      return await stub.fetch(request);
+      const response = await stub.fetch(request);
+      console.log(`[worker] <-- ${method} ${url} ${response.status}`);
+
+      if (response.status === 403) {
+        // Clone the response so we can read the body for logging while still
+        // returning the original (unread) stream to the caller.
+        const cloned = response.clone();
+        let responseBody = "(unreadable)";
+        try {
+          responseBody = await cloned.text();
+        } catch {
+          // ignore body-read failures
+        }
+        const reqHeaders: Record<string, string> = {};
+        request.headers.forEach((value, key) => { reqHeaders[key] = value; });
+        const resHeaders: Record<string, string> = {};
+        response.headers.forEach((value, key) => { resHeaders[key] = value; });
+        console.error(
+          `[worker] 403 detail ${method} ${url}`,
+          JSON.stringify({ requestHeaders: reqHeaders, responseHeaders: resHeaders, responseBody })
+        );
+      }
+
+      return response;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[worker] HTTP proxy error:", message);
